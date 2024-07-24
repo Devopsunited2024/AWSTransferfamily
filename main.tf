@@ -10,8 +10,8 @@ resource "aws_transfer_server" "sftp_server" {
   endpoint_type          = "VPC"
 
   endpoint_details {
-    vpc_id             = "vpc-0ed60e8064018fabb"      # Replace with your VPC ID
-    subnet_ids         = ["subnet-0fc37c5def4bc4346"] # Replace with your subnet ID
+    vpc_id             = "vpc-00591095f5a6e5ab8"      # Replace with your VPC ID
+    subnet_ids         = ["subnet-097b7b7ff4c93aae6"] # Replace with your subnet ID
     security_group_ids = [aws_security_group.transfer_sg.id]
   }
 
@@ -33,7 +33,7 @@ resource "aws_efs_file_system" "transfer_efs" {
 # Create a mount target for the EFS file system
 resource "aws_efs_mount_target" "efs_mount" {
   file_system_id = aws_efs_file_system.transfer_efs.id
-  subnet_id      = "subnet-0fc37c5def4bc4346" # Replace with your subnet ID
+  subnet_id      = "subnet-097b7b7ff4c93aae6" # Replace with your subnet ID
 }
 
 # Create an IAM role for the Transfer Family server
@@ -84,7 +84,7 @@ resource "aws_transfer_ssh_key" "sftp_user_key" {
 resource "aws_security_group" "transfer_sg" {
   name        = "transfer-family-sg"
   description = "Security group for AWS Transfer Family"
-  vpc_id      = "vpc-xxxxxxxx" # Replace with your VPC ID
+  vpc_id      = "vpc-00591095f5a6e5ab8" # Replace with your VPC ID
 
   # Allow inbound SFTP traffic
   ingress {
@@ -118,9 +118,34 @@ resource "aws_cloudwatch_metric_alarm" "transfer_family_alarm" {
   statistic           = "Sum"
   threshold           = "1"
   alarm_description   = "This metric monitors AWS Transfer Family errors"
-  alarm_actions       = ["arn:aws:sns:us-west-1:058264405340:Transfer-family-alert"] # Replace with your SNS topic ARN
+  alarm_actions       = ["arn:aws:sns:us-west-2:058264405340:Transfer-family-alert"] # Replace with your SNS topic ARN
 
   dimensions = {
     ServerId = aws_transfer_server.sftp_server.id
   }
 }
+
+# Create an EC2 instance
+resource "aws_instance" "efs_ec2" {
+  ami           = "ami-074be47313f84fa38"
+  instance_type = "t2.micro"
+  key_name      = "devops_keypair" # Replace with your key pair name
+
+  vpc_security_group_ids = [
+    aws_security_group.transfer_sg.id,  # Corrected from efs_sg to transfer_sg
+  ]
+
+  user_data = <<-EOF
+              #!/bin/bash
+              yum update -y
+              yum install -y nfs-utils
+              mkdir -p /mnt/efs
+              mount -t nfs -o nfsvers=4.1 ${aws_efs_file_system.transfer_efs.dns_name}:/ /mnt/efs
+              echo "${aws_efs_file_system.transfer_efs.dns_name}:/ /mnt/efs nfs4 defaults,_netdev 0 0" >> /etc/fstab
+              EOF
+
+  tags = {
+    Name = "efs_ec2"
+  }
+}
+

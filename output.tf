@@ -1,5 +1,3 @@
-# output.tf
-
 output "sftp_server_id" {
   description = "The ID of the SFTP server"
   value       = aws_transfer_server.sftp_server.id
@@ -23,4 +21,9 @@ output "sftp_user_name" {
 output "security_group_id" {
   description = "The ID of the security group"
   value       = aws_security_group.transfer_sg.id
+}
+
+output "efs_dns_name" {
+  description = "The DNS name of the EFS file system"
+  value       = aws_efs_file_system.transfer_efs.dns_name
 }
